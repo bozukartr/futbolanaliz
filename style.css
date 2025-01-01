@@ -1487,4 +1487,119 @@ body {
     .table-row, .evaluation-point {
         cursor: default;
     }
+}
+
+/* Başlangıç Modal Stilleri */
+.intro-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(13, 17, 23, 0.95);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+
+.intro-content {
+    background: var(--bg-secondary);
+    border-radius: 16px;
+    padding: 25px;
+    max-width: 90%;
+    width: 400px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.intro-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.step {
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+    padding: 5px;
+}
+
+.step-number {
+    background: var(--accent-blue);
+    color: white;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.step p {
+    color: var(--text-primary);
+    font-size: 1rem;
+    line-height: 1.5;
+    margin: 0;
+    padding: 3px 0;
+}
+
+.intro-footer {
+    margin-top: 25px;
+    text-align: center;
+}
+
+.tap-text {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    opacity: 0.8;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 0.4;
+    }
+    50% {
+        opacity: 0.8;
+    }
+    100% {
+        opacity: 0.4;
+    }
+}
+
+/* Modal Mobil Responsive */
+@media screen and (max-width: 480px) {
+    .intro-content {
+        padding: 20px;
+        max-width: 95%;
+    }
+
+    .step {
+        gap: 12px;
+    }
+
+    .step-number {
+        width: 24px;
+        height: 24px;
+        font-size: 0.9rem;
+    }
+
+    .step p {
+        font-size: 0.95rem;
+    }
+
+    .tap-text {
+        font-size: 0.85rem;
+    }
+}
+
+/* Modal Kapatma Animasyonu */
+.intro-modal.fade-out {
+    opacity: 0;
+    pointer-events: none;
 } 

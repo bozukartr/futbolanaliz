@@ -39,14 +39,14 @@ async function loadLeagueData(leagueKey) {
         console.log(`${leagueKey} verileri yükleniyor...`);
         
         // Ana veriler
-        const response = await fetch(`/futbolanaliz/leagues/${leagueKey}.csv`);
+        const response = await fetch(`https://bozukartr.github.io/futbolanaliz/leagues/${leagueKey}.csv`);
         if (!response.ok) {
             throw new Error(`Ana veri yüklenemedi: ${response.status}`);
         }
         const csvText = await response.text();
         
         // İstatistik verileri
-        const statsResponse = await fetch(`/futbolanaliz/leagues/statistics/${leagueKey}.csv`);
+        const statsResponse = await fetch(`https://bozukartr.github.io/futbolanaliz/leagues/statistics/${leagueKey}.csv`);
         if (!statsResponse.ok) {
             throw new Error(`İstatistik verisi yüklenemedi: ${statsResponse.status}`);
         }
@@ -66,7 +66,7 @@ async function loadLeagueData(leagueKey) {
         };
     } catch (error) {
         console.error(`${leagueKey} verileri yüklenirken hata:`, error);
-        throw error; // Hatayı yukarı fırlat
+        throw error;
     }
 }
 
@@ -114,8 +114,31 @@ async function loadAllLeagues() {
     }
 }
 
-// Sayfa yüklendiğinde verileri yükle
-window.addEventListener('load', loadAllLeagues);
+// Sayfa yüklendiğinde verileri yükle ve modalı göster
+window.addEventListener('load', async () => {
+    await loadAllLeagues();
+    initIntroModal();
+});
+
+// Başlangıç modalını başlat
+function initIntroModal() {
+    const introModal = document.getElementById('introModal');
+    
+    // Modal'ı herhangi bir yere tıklandığında kapat
+    introModal.addEventListener('click', () => {
+        introModal.classList.add('fade-out');
+        // Modal tamamen kaybolduğunda DOM'dan kaldır
+        setTimeout(() => {
+            introModal.remove();
+        }, 300);
+    });
+
+    // Modal içeriğine tıklandığında event'in yukarı yayılmasını engelle
+    const introContent = introModal.querySelector('.intro-content');
+    introContent.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
+}
 
 // Takım verilerini getir ve göster
 async function fetchTeamData(teamId) {
@@ -1328,14 +1351,27 @@ async function getSquadAnalysis(team1Name, team2Name) {
 // Takım oyuncularını yükle
 async function loadTeamPlayers(teamName) {
     try {
-        const response = await fetch(`/futbolanaliz/leagues/statistics/Players/${teamName.toLowerCase()}_players.csv`);
+        // Dosya adını düzenle
+        const fileName = teamName.toLowerCase()
+            .replace(/\s+/g, '') // Boşlukları kaldır
+            .replace(/ı/g, 'i')  // Türkçe karakterleri düzelt
+            .replace(/ğ/g, 'g')
+            .replace(/ü/g, 'u')
+            .replace(/ş/g, 's')
+            .replace(/ö/g, 'o')
+            .replace(/ç/g, 'c');
+
+        const response = await fetch(`https://bozukartr.github.io/futbolanaliz/leagues/statistics/players/${fileName}.csv`);
+        
         if (!response.ok) {
-            throw new Error(`Oyuncu verileri yüklenemedi: ${response.status}`);
+            console.warn(`${teamName} için oyuncu verileri bulunamadı (${response.status})`);
+            return [];
         }
+        
         const csvText = await response.text();
         return parseCSV(csvText);
     } catch (error) {
-        console.error(`${teamName} oyuncu verileri yüklenirken hata:`, error);
+        console.warn(`${teamName} oyuncu verileri yüklenirken hata:`, error);
         return [];
     }
 }
@@ -1343,83 +1379,136 @@ async function loadTeamPlayers(teamName) {
 // Kadro değerlendirmesi için yeni fonksiyon
 async function getSquadEvaluation(team1Name, team2Name) {
     try {
-        const team1Players = await loadTeamPlayers(team1Name);
-        const team2Players = await loadTeamPlayers(team2Name);
+        const [team1Players, team2Players] = await Promise.all([
+            loadTeamPlayers(team1Name),
+            loadTeamPlayers(team2Name)
+        ]);
         
+        // Eğer oyuncu verileri yoksa basit bir analiz döndür
+        if (!team1Players.length && !team2Players.length) {
+            return `
+                <div class="evaluation-point">
+                    <span class="point-icon">ℹ️</span>
+                    <span class="point-text">Detaylı kadro analizi için veri bulunamadı.</span>
+                </div>
+            `;
+        }
+
+        // Tek takımın verisi varsa o takım hakkında bilgi ver
         if (!team1Players.length || !team2Players.length) {
-            return `<div class="analysis-point">Takım kadro bilgileri bulunamadı</div>`;
+            const availableTeam = team1Players.length ? team1Name : team2Name;
+            const availablePlayers = team1Players.length ? team1Players : team2Players;
+            
+            return generateSingleTeamAnalysis(availableTeam, availablePlayers);
         }
 
-        const team1Stats = calculateDetailedTeamStats(team1Players);
-        const team2Stats = calculateDetailedTeamStats(team2Players);
-
-        const analyses = [];
-
-        // En golcü oyuncu analizi
-        if (team1Stats.topScorer.goals > 0) {
-            analyses.push(`${team1Name} takımının en skorer oyuncusu ${team1Stats.topScorer.name} (${team1Stats.topScorer.goals} gol)`);
-        }
-        if (team2Stats.topScorer.goals > 0) {
-            analyses.push(`${team2Name} takımının en skorer oyuncusu ${team2Stats.topScorer.name} (${team2Stats.topScorer.goals} gol)`);
-        }
-
-        // En asistçi oyuncu analizi
-        if (team1Stats.topAssist.assists > 0) {
-            analyses.push(`${team1Name} takımının asist lideri ${team1Stats.topAssist.name} (${team1Stats.topAssist.assists} asist)`);
-        }
-        if (team2Stats.topAssist.assists > 0) {
-            analyses.push(`${team2Name} takımının asist lideri ${team2Stats.topAssist.name} (${team2Stats.topAssist.assists} asist)`);
-        }
-
-        // Şut isabeti analizi
-        const team1ShotAccuracy = calculateShotAccuracy(team1Players);
-        const team2ShotAccuracy = calculateShotAccuracy(team2Players);
-        if (Math.abs(team1ShotAccuracy - team2ShotAccuracy) > 5) {
-            const betterTeam = team1ShotAccuracy > team2ShotAccuracy ? team1Name : team2Name;
-            analyses.push(`${betterTeam} isabetli şut oranında daha başarılı`);
-        }
-
-        // Pas organizasyonu analizi
-        const team1PassAccuracy = calculatePassAccuracy(team1Players);
-        const team2PassAccuracy = calculatePassAccuracy(team2Players);
-        if (Math.abs(team1PassAccuracy - team2PassAccuracy) > 3) {
-            const betterTeam = team1PassAccuracy > team2PassAccuracy ? team1Name : team2Name;
-            analyses.push(`${betterTeam} pas organizasyonunda daha etkili`);
-        }
-
-        // Takım derinliği analizi
-        const team1Depth = calculateSquadDepth(team1Players);
-        const team2Depth = calculateSquadDepth(team2Players);
-        if (Math.abs(team1Depth - team2Depth) > 2) {
-            const betterTeam = team1Depth > team2Depth ? team1Name : team2Name;
-            analyses.push(`${betterTeam} daha geniş bir kadro derinliğine sahip`);
-        }
-
-        return `
-            <div class="squad-evaluation">
-                <div class="evaluation-header">
-                    <div class="team-comparison">
-                        <div class="team-info">
-                            <span class="team-name">${team1Name}</span>
-                            <span class="vs">VS</span>
-                            <span class="team-name">${team2Name}</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="evaluation-content">
-                    ${analyses.map(analysis => `
-                        <div class="evaluation-point">
-                            <span class="point-icon">▪️</span>
-                            <span class="point-text">${analysis}</span>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
+        // Her iki takımın da verisi varsa karşılaştırmalı analiz yap
+        return generateComparativeAnalysis(team1Name, team2Name, team1Players, team2Players);
     } catch (error) {
         console.error('Kadro değerlendirmesi yapılırken hata:', error);
-        return `<div class="analysis-point">Kadro değerlendirmesi yapılırken bir hata oluştu</div>`;
+        return `
+            <div class="evaluation-point">
+                <span class="point-icon">⚠️</span>
+                <span class="point-text">Kadro değerlendirmesi yapılırken bir hata oluştu.</span>
+            </div>
+        `;
     }
+}
+
+// Tek takım analizi
+function generateSingleTeamAnalysis(teamName, players) {
+    const stats = calculateDetailedTeamStats(players);
+    
+    return `
+        <div class="squad-evaluation">
+            <div class="evaluation-content">
+                <div class="evaluation-point">
+                    <span class="point-icon">ℹ️</span>
+                    <span class="point-text">Yalnızca ${teamName} için kadro verisi mevcut.</span>
+                </div>
+                ${stats.topScorer.goals > 0 ? `
+                    <div class="evaluation-point">
+                        <span class="point-icon">⚽</span>
+                        <span class="point-text">En golcü oyuncu: ${stats.topScorer.name} (${stats.topScorer.goals} gol)</span>
+                    </div>
+                ` : ''}
+                ${stats.topAssist.assists > 0 ? `
+                    <div class="evaluation-point">
+                        <span class="point-icon">👟</span>
+                        <span class="point-text">En çok asist yapan: ${stats.topAssist.name} (${stats.topAssist.assists} asist)</span>
+                    </div>
+                ` : ''}
+            </div>
+        </div>
+    `;
+}
+
+// Karşılaştırmalı analiz
+function generateComparativeAnalysis(team1Name, team2Name, team1Players, team2Players) {
+    const team1Stats = calculateDetailedTeamStats(team1Players);
+    const team2Stats = calculateDetailedTeamStats(team2Players);
+    
+    const analyses = [];
+    
+    // Gol krallığı analizi
+    if (team1Stats.topScorer.goals > 0 || team2Stats.topScorer.goals > 0) {
+        const bestScorer = team1Stats.topScorer.goals > team2Stats.topScorer.goals ? 
+            {name: team1Stats.topScorer.name, goals: team1Stats.topScorer.goals, team: team1Name} :
+            {name: team2Stats.topScorer.name, goals: team2Stats.topScorer.goals, team: team2Name};
+            
+        analyses.push(`
+            <div class="evaluation-point">
+                <span class="point-icon">⚽</span>
+                <span class="point-text">Maçın en golcü oyuncusu ${bestScorer.team} forması giyen ${bestScorer.name} (${bestScorer.goals} gol)</span>
+            </div>
+        `);
+    }
+    
+    // Asist krallığı analizi
+    if (team1Stats.topAssist.assists > 0 || team2Stats.topAssist.assists > 0) {
+        const bestAssist = team1Stats.topAssist.assists > team2Stats.topAssist.assists ?
+            {name: team1Stats.topAssist.name, assists: team1Stats.topAssist.assists, team: team1Name} :
+            {name: team2Stats.topAssist.name, assists: team2Stats.topAssist.assists, team: team2Name};
+            
+        analyses.push(`
+            <div class="evaluation-point">
+                <span class="point-icon">👟</span>
+                <span class="point-text">En etkili asistçi ${bestAssist.team}'dan ${bestAssist.name} (${bestAssist.assists} asist)</span>
+            </div>
+        `);
+    }
+    
+    // Takım performans analizi
+    const team1Form = calculateTeamForm(team1Players);
+    const team2Form = calculateTeamForm(team2Players);
+    const formDiff = Math.abs(team1Form - team2Form);
+    
+    if (formDiff > 0.5) {
+        const betterForm = team1Form > team2Form ? team1Name : team2Name;
+        analyses.push(`
+            <div class="evaluation-point">
+                <span class="point-icon">📈</span>
+                <span class="point-text">${betterForm} son maçlarda daha iyi form grafiği sergiliyor</span>
+            </div>
+        `);
+    }
+
+    return `
+        <div class="squad-evaluation">
+            <div class="evaluation-header">
+                <div class="team-comparison">
+                    <div class="team-info">
+                        <span class="team-name">${team1Name}</span>
+                        <span class="vs">VS</span>
+                        <span class="team-name">${team2Name}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="evaluation-content">
+                ${analyses.join('')}
+            </div>
+        </div>
+    `;
 }
 
 // Yardımcı fonksiyonlar
