@@ -39,14 +39,14 @@ async function loadLeagueData(leagueKey) {
         console.log(`${leagueKey} verileri yükleniyor...`);
         
         // Ana veriler
-        const response = await fetch(`../leagues/${leagueKey}.csv`);
+        const response = await fetch(`/futbolanaliz/leagues/${leagueKey}.csv`);
         if (!response.ok) {
             throw new Error(`Ana veri yüklenemedi: ${response.status}`);
         }
         const csvText = await response.text();
         
         // İstatistik verileri
-        const statsResponse = await fetch(`../leagues/statistics/${leagueKey}.csv`);
+        const statsResponse = await fetch(`/futbolanaliz/leagues/statistics/${leagueKey}.csv`);
         if (!statsResponse.ok) {
             throw new Error(`İstatistik verisi yüklenemedi: ${statsResponse.status}`);
         }
@@ -66,7 +66,7 @@ async function loadLeagueData(leagueKey) {
         };
     } catch (error) {
         console.error(`${leagueKey} verileri yüklenirken hata:`, error);
-        return { main: [], stats: [] };
+        throw error; // Hatayı yukarı fırlat
     }
 }
 
@@ -705,7 +705,7 @@ async function showResults(team1Name, team2Name, results, simCount) {
                         </div>
                         <div class="table-row highlight">
                             <div class="home-value">${(parseInt(team1.home_goals_for) / (parseInt(team1.home_wins) + parseInt(team1.home_draws) + parseInt(team1.home_losses))).toFixed(1)}</div>
-                            <div class="stat-label">Maç Başı Gol</div>
+                            <div class="stat-label">Gol/Maç</div>
                             <div class="away-value">${(parseInt(team2.away_goals_for) / (parseInt(team2.away_wins) + parseInt(team2.away_draws) + parseInt(team2.away_losses))).toFixed(1)}</div>
                         </div>
                     </div>
@@ -1328,7 +1328,7 @@ async function getSquadAnalysis(team1Name, team2Name) {
 // Takım oyuncularını yükle
 async function loadTeamPlayers(teamName) {
     try {
-        const response = await fetch(`../leagues/statistics/Players/${teamName.toLowerCase()}_players.csv`);
+        const response = await fetch(`/futbolanaliz/leagues/statistics/Players/${teamName.toLowerCase()}_players.csv`);
         if (!response.ok) {
             throw new Error(`Oyuncu verileri yüklenemedi: ${response.status}`);
         }
